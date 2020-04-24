@@ -1,14 +1,8 @@
 package net.wicstech.ordertables;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,6 +12,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+/**
+ * Retrieve all tables from connection and order them for delete statements.
+ * 
+ * @author sergio
+ *
+ */
 public class OrderDelete {
 	private static final Logger LOG = Logger.getLogger(OrderDelete.class.getSimpleName());
 	private final Connection connection;
@@ -62,15 +62,6 @@ public class OrderDelete {
 		return this.catalog;
 	}
 
-	public void debugRs(ResultSet rs) throws SQLException {
-		ResultSetMetaData me = rs.getMetaData();
-		for (int i = 1; i <= me.getColumnCount(); i++) {
-			String label = me.getColumnLabel(i);
-			String value = rs.getString(i);
-			System.out.printf("%s => %s%n", label, value);
-		}
-	}
-
 	public void sort() {
 		for (; index < tables.size(); index = index + shifted + 1) {
 			shifted = 0;
@@ -84,24 +75,8 @@ public class OrderDelete {
 	}
 
 	private void recurseTable(Connection connection, String tableName) throws SQLException {
-		List<String> foreignColumns = getForeignColumns(connection, tableName);
-		for (String colName : foreignColumns) {
-			String sql = readString("/find_table_by_fk.sql");
-			PreparedStatement ps = connection.prepareStatement(sql);
-			ps.setString(1, getCatalog() + "%");
-			ps.setString(2, "%" + tableName);
-			ps.setString(3, colName);
-
-			List<Map<String, Object>> rs = ResultSetUtil.extractResultSet(ps);
-			String dependentTable = rs
-			//@formatter:off
-					.stream()
-					.flatMap(m -> m.values().stream())
-					.findFirst()
-					.map(String::valueOf)
-					.map(s -> s.replaceFirst(catalog + "/", ""))
-					.orElse(null);
-				//@formatter:on
+		List<String> foreignColumns = getDependentTables(connection, tableName);
+		for (String dependentTable : foreignColumns) {
 
 			int indiceEncontrado = tables.indexOf(dependentTable);
 			if (indiceEncontrado > (index + shifted)) {
@@ -112,21 +87,16 @@ public class OrderDelete {
 		}
 	}
 
-	private String readString(String fileName) {
-		try {
-			return Files.readString(Paths.get(this.getClass().getResource(fileName).toURI()));
-		} catch (IOException | URISyntaxException e) {
-			LOG.log(Level.SEVERE, e.getMessage(), e);
-			throw new RuntimeException(e);
-		}
-	}
-
-	private List<String> getForeignColumns(Connection connection, String tableName) throws SQLException {
-		PreparedStatement ps = connection.prepareStatement(readString("/find_fk_by_table_name.sql"));
-		ps.setString(1, getCatalog() + "%");
-		ps.setString(2, "%" + tableName);
-		List<Map<String, Object>> resultSet = ResultSetUtil.extractResultSet(ps);
-		return resultSet.stream().map(m -> m.get("FOR_COL_NAME")).map(String::valueOf).collect(Collectors.toList());
+	private List<String> getDependentTables(Connection connection, String tableName) throws SQLException {
+		ResultSet rs = getMetadata().getImportedKeys(getCatalog(), "", tableName);
+		List<Map<String, Object>> result = ResultSetUtil.extractResultSet(rs);
+		return result
+		//@formatter:off
+				.stream()
+				.map(t -> t.get("PKTABLE_NAME"))
+				.map(String::valueOf)
+				.collect(Collectors.toList());
+		//@formatter:on
 	}
 
 	public List<String> forDelete() {

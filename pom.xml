@@ -3,6 +3,7 @@
 	<groupId>net.wicstech</groupId>
 	<artifactId>order-tables</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
+	<name>Order Tables for Delete</name>
 	<build>
 		<plugins>
 			<plugin>

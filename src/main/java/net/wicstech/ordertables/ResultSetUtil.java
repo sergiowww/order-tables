@@ -18,8 +18,14 @@ public class ResultSetUtil {
 	}
 
 	public static List<Map<String, Object>> extractResultSet(PreparedStatement providedPS) throws SQLException {
-		List<Map<String, Object>> resultado = new ArrayList<>();
 		try (PreparedStatement ps = providedPS; ResultSet rs = ps.executeQuery()) {
+			return extractResultSet(rs);
+		}
+	}
+
+	public static List<Map<String, Object>> extractResultSet(ResultSet providedRS) throws SQLException {
+		List<Map<String, Object>> resultado = new ArrayList<>();
+		try (ResultSet rs = providedRS) {
 			while (rs.next()) {
 				Map<String, Object> tupla = new HashMap<>();
 				ResultSetMetaData metaData = rs.getMetaData();
