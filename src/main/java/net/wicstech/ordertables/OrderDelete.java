@@ -7,10 +7,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -35,7 +33,6 @@ public class OrderDelete {
 	private String tableNamePattern;
 	private Map<String, List<String>> dependentTablesCache = new HashMap<>();
 
-	private Set<String> pilhaRecursao = new HashSet<String>();
 
 	public OrderDelete(Connection connection) {
 		this.connection = connection;
@@ -73,12 +70,13 @@ public class OrderDelete {
 	}
 
 	public void sort() {
+		System.out.printf("Inicial: %s%n", tables);
 		for (; index < tables.size(); index = index + shifted + 1) {
 			shifted = 0;
 			try {
 				String tableName = tables.get(index);
+				System.out.printf("%d/%d -> %s (shifted: %d)%n", index, tables.size(), tableName, shifted);
 				recurseTable(connection, tableName);
-				this.pilhaRecursao = new HashSet<String>();
 			} catch (SQLException e) {
 				LOG.log(Level.SEVERE, e.getMessage(), e);
 				throw new RuntimeException(e);
@@ -87,19 +85,24 @@ public class OrderDelete {
 	}
 
 	private void recurseTable(Connection connection, String tableName) throws SQLException {
-		if (!pilhaRecursao.contains(tableName)) {
-			pilhaRecursao.add(tableName);
+		System.out.printf("%n================%n%s%n", tableName);
 			List<String> depTables = getDependentTables(connection, tableName);
 			for (String dependentTable : depTables) {
 				int indiceEncontrado = tables.indexOf(dependentTable);
-				if (indiceEncontrado > (index + shifted)) {
+				int percorrido = index + shifted;
+				System.out.printf("%s -> %s [found: %d] [%d + %d = %d]", tableName, depTables, indiceEncontrado, shifted, index, percorrido);
+				if (indiceEncontrado > percorrido) {
 					tables.add(index, tables.remove(indiceEncontrado));
 					shifted++;
+					System.out.printf(" %n%s", tables);
+				}else if(indiceEncontrado >= 0 && indiceEncontrado < percorrido) {
+					tables.add(index, tables.remove(indiceEncontrado));
+					System.out.printf(" %n%s", tables);
 				}
 
 				recurseTable(connection, dependentTable);
 			}
-		}
+		
 	}
 
 	private List<String> getDependentTables(Connection connection, String tableName) throws SQLException {
