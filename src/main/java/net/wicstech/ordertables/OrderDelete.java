@@ -5,13 +5,16 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+
+import org.jgrapht.Graph;
+import org.jgrapht.graph.DefaultDirectedGraph;
+import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.traverse.TopologicalOrderIterator;
 
 /**
  * Retrieve all tables from connection and order them for delete statements.
@@ -25,14 +28,12 @@ public class OrderDelete {
 	private String catalog;
 	private DatabaseMetaData metadata;
 
+	private Graph<String, DefaultEdge> tree = new DefaultDirectedGraph<>(DefaultEdge.class);
+
 	private List<String> tables;
-	private int index;
-	private int shifted;
 
 	private String schemaPattern;
 	private String tableNamePattern;
-	private Map<String, List<String>> dependentTablesCache = new HashMap<>();
-
 
 	public OrderDelete(Connection connection) {
 		this.connection = connection;
@@ -41,8 +42,7 @@ public class OrderDelete {
 	private List<String> getTables() {
 		try {
 			List<String> tableNames = new ArrayList<>();
-			try (ResultSet tables = getMetadata().getTables(this.getCatalog(), this.schemaPattern,
-					this.tableNamePattern, null)) {
+			try (ResultSet tables = getMetadata().getTables(this.getCatalog(), this.schemaPattern, this.tableNamePattern, null)) {
 				while (tables.next()) {
 					String table = tables.getString("TABLE_NAME");
 					tableNames.add(table);
@@ -71,62 +71,41 @@ public class OrderDelete {
 
 	public void sort() {
 		System.out.printf("Inicial: %s%n", tables);
-		for (; index < tables.size(); index = index + shifted + 1) {
-			shifted = 0;
-			try {
-				String tableName = tables.get(index);
-				System.out.printf("%d/%d -> %s (shifted: %d)%n", index, tables.size(), tableName, shifted);
-				recurseTable(connection, tableName);
-			} catch (SQLException e) {
-				LOG.log(Level.SEVERE, e.getMessage(), e);
-				throw new RuntimeException(e);
+		try {
+			tables.forEach(tree::addVertex);
+			for (String table : tables) {
+				List<String> dependentTables = this.getDependentTables(table);
+				dependentTables.forEach(d -> tree.addEdge(table, d));
 			}
+			TopologicalOrderIterator<String, DefaultEdge> depthFirstIterator = new TopologicalOrderIterator<>(tree);
+			tables.clear();
+			while(depthFirstIterator.hasNext()) {
+				tables.add(depthFirstIterator.next());
+			}
+			System.out.printf("Final: %s%n", tables);	
+		} catch (SQLException e) {
+			LOG.log(Level.SEVERE, e.getMessage(), e);
+			throw new RuntimeException(e);
 		}
 	}
 
-	private void recurseTable(Connection connection, String tableName) throws SQLException {
-		System.out.printf("%n================%n%s%n", tableName);
-			List<String> depTables = getDependentTables(connection, tableName);
-			for (String dependentTable : depTables) {
-				int indiceEncontrado = tables.indexOf(dependentTable);
-				int percorrido = index + shifted;
-				System.out.printf("%s -> %s [found: %d] [%d + %d = %d]", tableName, depTables, indiceEncontrado, shifted, index, percorrido);
-				if (indiceEncontrado > percorrido) {
-					tables.add(index, tables.remove(indiceEncontrado));
-					shifted++;
-					System.out.printf(" %n%s", tables);
-				}else if(indiceEncontrado >= 0 && indiceEncontrado < percorrido) {
-					tables.add(index, tables.remove(indiceEncontrado));
-					System.out.printf(" %n%s", tables);
-				}
-
-				recurseTable(connection, dependentTable);
-			}
-		
-	}
-
-	private List<String> getDependentTables(Connection connection, String tableName) throws SQLException {
-		List<String> dependentTable = dependentTablesCache.get(tableName);
-		if (dependentTable == null) {
-
-			ResultSet rs = getMetadata().getImportedKeys(getCatalog(), "", tableName);
-			List<Map<String, Object>> result = ResultSetUtil.extractResultSet(rs);
-			dependentTable = result
-					.stream()
-					.map(t -> t.get("PKTABLE_NAME"))
-					.map(String::valueOf)
-					.distinct()
-					.collect(Collectors.toList());
-			dependentTablesCache.put(tableName, dependentTable);
-		}
-		return dependentTable;
+	private List<String> getDependentTables(String tableName) throws SQLException {
+		ResultSet rs = getMetadata().getImportedKeys(getCatalog(), "", tableName);
+		List<Map<String, Object>> result = ResultSetUtil.extractResultSet(rs);
+		//@formatter:off
+		return result
+				.stream()
+				.map(t -> t.get("PKTABLE_NAME"))
+				.map(String::valueOf)
+				.distinct()
+				.collect(Collectors.toList());
+		//@formatter:on
 	}
 
 	public List<String> forDelete() {
 		if (tables == null) {
 			tables = getTables();
 			sort();
-			Collections.reverse(tables);
 		}
 		return tables;
 	}
