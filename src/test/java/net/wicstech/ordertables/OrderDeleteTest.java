@@ -1,8 +1,10 @@
 package net.wicstech.ordertables;
 
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.List;
 
 import org.junit.jupiter.api.Disabled;
@@ -14,8 +16,6 @@ import com.wix.mysql.config.MysqldConfig;
 import com.wix.mysql.distribution.Version;
 
 class OrderDeleteTest {
-
-	private static final String SCHEMA_DATABASE = "severino";
 
 	@Test
 	@Disabled
@@ -42,14 +42,22 @@ class OrderDeleteTest {
 	}
 
 	@Test
-	void testMysql() throws Exception {
+	void testMysqlStudy() throws Exception {
+		runTestOn("study.sql", "study");
+	}
+	@Test
+	void testMysqlSeverino() throws Exception {
+		runTestOn("severino.sql", "severino");
+	}
+
+	private void runTestOn(String script, String schema) throws IOException, SQLException, Exception {
 		MysqldConfig config = MysqldConfig.aMysqldConfig(Version.v5_7_latest).withFreePort()
 				.build();
 
 		EmbeddedMysql mysqld = EmbeddedMysql.anEmbeddedMysql(config)
-				.addSchema(SCHEMA_DATABASE, ScriptResolver.classPathScript("severino.sql")).start();
+				.addSchema(schema, ScriptResolver.classPathScript(script)).start();
 		
-		try (Connection connection = DriverManager.getConnection(String.format("jdbc:mysql://localhost:%d/%s", config.getPort(), SCHEMA_DATABASE), config.getUsername(),
+		try (Connection connection = DriverManager.getConnection(String.format("jdbc:mysql://localhost:%d/%s", config.getPort(), schema), config.getUsername(),
 				config.getPassword())) {
 			OrderDelete order = new OrderDelete(connection);
 			List<String> tableNames = order.forDelete();
@@ -71,7 +79,6 @@ class OrderDeleteTest {
 		} finally {
 			mysqld.stop();
 		}
-
 	}
 
 }

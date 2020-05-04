@@ -45,7 +45,7 @@ public class OrderDelete {
 			try (ResultSet tables = getMetadata().getTables(this.getCatalog(), this.schemaPattern, this.tableNamePattern, null)) {
 				while (tables.next()) {
 					String table = tables.getString("TABLE_NAME");
-					tableNames.add(table);
+					tableNames.add(table.toLowerCase());
 				}
 			}
 			return tableNames;
@@ -97,6 +97,7 @@ public class OrderDelete {
 				.stream()
 				.map(t -> t.get("PKTABLE_NAME"))
 				.map(String::valueOf)
+				.map(String::toLowerCase)
 				.distinct()
 				.collect(Collectors.toList());
 		//@formatter:on
