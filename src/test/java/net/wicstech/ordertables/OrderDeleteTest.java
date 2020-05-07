@@ -27,7 +27,6 @@ class OrderDeleteTest {
 			List<String> tableNames = order.forDelete();
 			tableNames.forEach(System.out::println);
 			connection.setAutoCommit(false);
-			connection.beginRequest();
 			for (String tableName : tableNames) {
 				try (PreparedStatement ps = connection.prepareStatement(String.format("delete from %s", tableName))) {
 					int rows = ps.executeUpdate();
@@ -63,7 +62,6 @@ class OrderDeleteTest {
 			List<String> tableNames = order.forDelete();
 			System.out.println(tableNames);
 			connection.setAutoCommit(false);
-			connection.beginRequest();
 			for (String tableName : tableNames) {
 				String deleteCommand = String.format("delete from %s", tableName);
 				try (PreparedStatement ps = connection.prepareStatement(deleteCommand)) {
