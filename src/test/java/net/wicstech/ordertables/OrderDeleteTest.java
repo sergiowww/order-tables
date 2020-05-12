@@ -20,8 +20,7 @@ class OrderDeleteTest {
 	@Test
 	@Disabled
 	void testSqlServer() throws Exception {
-		try (Connection connection = DriverManager.getConnection("jdbc:jtds:sqlserver://localhost/PROTETOR", "sa",
-				"123456")) {
+		try (Connection connection = DriverManager.getConnection("jdbc:jtds:sqlserver://localhost/PROTETOR", "sa", "123456")) {
 			OrderDelete order = new OrderDelete(connection);
 			order.setSchemaPattern("dbo");
 			List<String> tableNames = order.forDelete();
@@ -39,25 +38,40 @@ class OrderDeleteTest {
 			connection.rollback();
 		}
 	}
+	
+	@Test
+	@Disabled
+	void testAurora() throws Exception {
+		generateDeleteStatements("aurorabuzz-test", 3306, "root", "123456");
+	}
 
 	@Test
 	void testMysqlStudy() throws Exception {
 		runTestOn("study.sql", "study");
 	}
+
 	@Test
 	void testMysqlSeverino() throws Exception {
 		runTestOn("severino.sql", "severino");
 	}
 
 	private void runTestOn(String script, String schema) throws IOException, SQLException, Exception {
-		MysqldConfig config = MysqldConfig.aMysqldConfig(Version.v5_7_latest).withFreePort()
-				.build();
+		MysqldConfig config = MysqldConfig.aMysqldConfig(Version.v5_7_latest).withFreePort().build();
 
-		EmbeddedMysql mysqld = EmbeddedMysql.anEmbeddedMysql(config)
-				.addSchema(schema, ScriptResolver.classPathScript(script)).start();
-		
-		try (Connection connection = DriverManager.getConnection(String.format("jdbc:mysql://localhost:%d/%s", config.getPort(), schema), config.getUsername(),
-				config.getPassword())) {
+		EmbeddedMysql mysqld = EmbeddedMysql.anEmbeddedMysql(config).addSchema(schema, ScriptResolver.classPathScript(script)).start();
+
+		int port = config.getPort();
+		String username = config.getUsername();
+		String password = config.getPassword();
+		try {
+			generateDeleteStatements(schema, port, username, password);
+		} finally {
+			mysqld.stop();
+		}
+	}
+
+	private void generateDeleteStatements(String schema, int port, String username, String password) throws SQLException, Exception {
+		try (Connection connection = DriverManager.getConnection(String.format("jdbc:mysql://localhost:%d/%s", port, schema), username, password)) {
 			OrderDelete order = new OrderDelete(connection);
 			List<String> tableNames = order.forDelete();
 			System.out.println(tableNames);
@@ -74,8 +88,6 @@ class OrderDeleteTest {
 				}
 			}
 			connection.rollback();
-		} finally {
-			mysqld.stop();
 		}
 	}
 
