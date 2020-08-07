@@ -12,8 +12,8 @@ import java.util.List;
  * <code> 
  * 
  * 		-DjdbcString=jdbc:mysql://localhost:3306/aurorabuzz-test?serverTimezone=America/Sao_Paulo
- * 		-Duser=root
- * 		-Dpassword=123456
+ * 		-DdbUsername=root
+ * 		-DdbPassword=123456
  * 
  * </code>
  * 
