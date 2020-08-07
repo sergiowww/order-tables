@@ -70,7 +70,6 @@ public class OrderDelete {
 	}
 
 	public void sort() {
-		System.out.printf("Inicial: %s%n", tables);
 		try {
 			tables.forEach(tree::addVertex);
 			for (String table : tables) {
@@ -82,7 +81,6 @@ public class OrderDelete {
 			while(depthFirstIterator.hasNext()) {
 				tables.add(depthFirstIterator.next());
 			}
-			System.out.printf("Final: %s%n", tables);	
 		} catch (SQLException e) {
 			LOG.log(Level.SEVERE, e.getMessage(), e);
 			throw new RuntimeException(e);
