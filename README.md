@@ -1,2 +1,2 @@
 # order-tables
-Order tables for delete in the correct order for tests cleanup
+Order tables for deletion taking the foreign key constraints into consideration
